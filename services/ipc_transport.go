@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
-	"log"
 	"os"
 	"strconv"
 	"sync"
@@ -13,8 +12,8 @@ import (
 	"github.com/keymetrics/pm2-io-apm-go/structures"
 )
 
-// IPCSMessage receive from KM
-type IPCSMessage struct {
+// IPCMessage receive from KM
+type IPCMessage struct {
 	Payload interface{} `json:"data"`
 	Channel string      `json:"type"`
 }
@@ -78,63 +77,54 @@ func (transporter *IPCTransporter) GetServer() *string {
 	return nil
 }
 
-// Connect noop
+// Connect start handlers
 func (transporter *IPCTransporter) Connect() {
+	if !transporter.isHandling {
+		transporter.SetHandlers()
+	}
 }
 
-// SetHandlers for messages and pinger ticker
+// SetHandlers for messages
 func (transporter *IPCTransporter) SetHandlers() {
+	transporter.isHandling = true
 	go transporter.MessagesHandler()
 }
 
-// MessagesHandler from KM
+// MessagesHandler pm2 trigger
 func (transporter *IPCTransporter) MessagesHandler() {
 	for {
 		message, err := transporter.channel.reader.ReadBytes('\n')
 		if err != nil {
-			panic(err)
+			transporter.isHandling = false
+			transporter.CloseAndReconnect()
+			return
 		}
 
 		var dat map[string]interface{}
+		var name string
+		var id string
 
 		if err := json.Unmarshal(message, &dat); err != nil {
-			panic(err)
-		}
-
-		if dat["channel"] == "trigger:action" {
-			payload := dat["payload"].(map[string]interface{})
-			name := payload["action_name"]
-
-			response := CallAction(name.(string), payload)
-
-			transporter.Send("trigger:action:success", map[string]interface{}{
-				"success":     true,
-				"id":          payload["process_id"],
-				"action_name": name,
-			})
-			transporter.Send("axm:reply", map[string]interface{}{
-				"action_name": name,
-				"return":      response,
-			})
-
-		} else if dat["channel"] == "trigger:pm2:action" {
-			payload := dat["payload"].(map[string]interface{})
-			name := payload["method_name"]
-			switch name {
-			case "startLogging":
-				transporter.SendJSON(map[string]interface{}{
-					"channel": "trigger:pm2:result",
-					"payload": map[string]interface{}{
-						"ret": map[string]interface{}{
-							"err": nil,
-						},
-					},
-				})
-				break
+			id = ""
+			if err := json.Unmarshal(message, &name); err != nil {
+				continue
 			}
 		} else {
-			log.Println("msg not registered: " + dat["channel"].(string))
+			name = dat["msg"].(string)
+			id = dat["id"].(string)
 		}
+
+		response := CallAction(name, dat)
+
+		transporter.Send("trigger:action:success", map[string]interface{}{
+			"success":     true,
+			"id":          id,
+			"action_name": name,
+		})
+		transporter.Send("axm:reply", map[string]interface{}{
+			"action_name": name,
+			"return":      response,
+		})
 	}
 }
 
@@ -157,29 +147,28 @@ func (transporter *IPCTransporter) Send(channel string, data interface{}) {
 	case "status":
 		status, ok := data.(structures.Status)
 		if ok {
-			transporter.SendJSON(IPCSMessage{
+			transporter.SendJSON(IPCMessage{
 				Channel: "axm:monitor",
 				Payload: status.Process[0].AxmMonitor,
 			})
-			transporter.SendJSON(IPCSMessage{
-				Channel: "axm:actions",
-				Payload: status.Process[0].AxmActions,
-			})
-			transporter.SendJSON(IPCSMessage{
-				Channel: "axm:options",
-				Payload: status.Process[0].AxmOptions,
-			})
+			for _, action := range status.Process[0].AxmActions {
+				transporter.SendJSON(IPCMessage{
+					Channel: "axm:action",
+					Payload: action,
+				})
+			}
 		}
 	default:
-		transporter.SendJSON(IPCSMessage{
+		transporter.SendJSON(IPCMessage{
 			Channel: channel,
 			Payload: data,
 		})
 	}
 }
 
-// CloseAndReconnect noop
+// CloseAndReconnect reconnect
 func (transporter *IPCTransporter) CloseAndReconnect() {
+	transporter.Connect()
 }
 
 // IsConnected expose if everything is running normally

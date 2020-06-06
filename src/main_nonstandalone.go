@@ -36,8 +36,8 @@ func main() {
 
 	services.AddAction(&structures.Action{
 		ActionName: "Test",
-		Callback: func(_ map[string]interface{}) string {
-			log.Println("Action TEST")
+		Callback: func(params map[string]interface{}) string {
+			log.Println("Action TEST, params:", params)
 			return "I am the test answer"
 		},
 	})
@@ -71,36 +71,6 @@ func main() {
 			//Pm2Io.Notifier.Error(err)
 		}
 	}()
-
-	go func() {
-		ticker := time.NewTicker(4 * time.Second)
-		log.Println("created log ticker")
-		for {
-			<-ticker.C
-			Pm2Io.Notifier.Log("I love logging things\n")
-		}
-	}()
-
-	/*go func() {
-		ticker := time.NewTicker(10 * time.Second)
-		log.Println("created reset ticker")
-		for {
-			<-ticker.C
-			log.Println("RestartTransporter")
-			Pm2Io.RestartTransporter()
-		}
-	}()*/
-
-	/*go func() {
-		ticker := time.NewTicker(6 * time.Second)
-		log.Println("created log ticker")
-		for {
-			<-ticker.C
-			cause := errors.New("Fatal panic error")
-			err := errors.WithStack(cause)
-			Pm2Io.Panic(err)
-		}
-	}()*/
 
 	http.ListenAndServe(":8089", nil)
 }
