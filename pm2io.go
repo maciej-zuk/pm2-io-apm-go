@@ -19,7 +19,7 @@ type Pm2Io struct {
 	Config *structures.Config
 
 	Notifier    *features.Notifier
-	transporter *services.Transporter
+	transporter services.Transporter
 
 	StatusOverrider func() *structures.Status
 
@@ -27,7 +27,7 @@ type Pm2Io struct {
 }
 
 // Start and prepare services + profiling
-func (pm2io *Pm2Io) Start() {
+func (pm2io *Pm2Io) Start() error {
 	pm2io.Config.InitNames()
 
 	defaultNode := "api.cloud.pm2.io"
@@ -35,7 +35,16 @@ func (pm2io *Pm2Io) Start() {
 		pm2io.Config.Node = &defaultNode
 	}
 
-	pm2io.transporter = services.NewTransporter(pm2io.Config, version)
+	if pm2io.Config.NonStandalone {
+		var err error
+		pm2io.transporter, err = services.NewIPCTransporter(pm2io.Config, version)
+		if err != nil {
+			return err
+		}
+	} else {
+		pm2io.transporter = services.NewWSTransporter(pm2io.Config, version)
+	}
+
 	pm2io.Notifier = &features.Notifier{
 		Transporter: pm2io.transporter,
 	}
@@ -53,6 +62,7 @@ func (pm2io *Pm2Io) Start() {
 			pm2io.SendStatus()
 		}
 	}()
+	return nil
 }
 
 // RestartTransporter including webSocket connection

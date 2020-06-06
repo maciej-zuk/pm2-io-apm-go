@@ -11,7 +11,7 @@ import (
 )
 
 // InitTracing with config and transporter provided
-func InitTracing(config *structures.Config, transporter *services.Transporter) error {
+func InitTracing(config *structures.Config, transporter services.Transporter) error {
 	endpoint, err := openzipkin.NewEndpoint(config.Name, "")
 	if err != nil {
 		return err
@@ -27,7 +27,7 @@ func InitTracing(config *structures.Config, transporter *services.Transporter) e
 
 // WsReporter is a Zipkin compatible reporter through PM2 WebSocket
 type WsReporter struct {
-	Transporter *services.Transporter
+	Transporter services.Transporter
 }
 
 // Send a message using PM2 transporter
@@ -46,17 +46,13 @@ func (r *WsReporter) Send(s model.SpanModel) {
 	}{
 		Process: structures.Process{
 			PmID:   0,
-			Name:   r.Transporter.Config.Name,
-			Server: r.Transporter.Config.ServerName,
+			Name:   r.Transporter.GetConfig().Name,
+			Server: r.Transporter.GetConfig().ServerName,
 		},
 		Alias:  (Alias)(s),
 		Timers: *timers,
 	}
-	msg := services.Message{
-		Channel: "trace-span",
-		Payload: t,
-	}
-	r.Transporter.SendJson(msg)
+	r.Transporter.Send("trace-span", t)
 }
 
 // Close the reporter (not used, ws handled in transporter)
@@ -65,7 +61,7 @@ func (r *WsReporter) Close() error {
 }
 
 // NewWsReporter create a reporter using specified transporter
-func NewWsReporter(transporter *services.Transporter) reporter.Reporter {
+func NewWsReporter(transporter services.Transporter) reporter.Reporter {
 	rep := WsReporter{
 		Transporter: transporter,
 	}

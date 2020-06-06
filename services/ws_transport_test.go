@@ -23,11 +23,11 @@ func TestTransport(t *testing.T) {
 	var wssServer *httptest.Server
 	var gockVerif *gock.Response
 
-	var transporter *services.Transporter
+	var transporter *services.WSTransporter
 	defaultNode := "api.cloud.pm2.io"
 
 	t.Run("Create transporter", func(t *testing.T) {
-		transporter = services.NewTransporter(&structures.Config{
+		transporter = services.NewWSTransporter(&structures.Config{
 			PublicKey:  "pubKey",
 			PrivateKey: "privKey",
 			Node:       &defaultNode, // Normally set by pm2io

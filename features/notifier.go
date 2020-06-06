@@ -9,7 +9,7 @@ import (
 
 // Notifier with transporter
 type Notifier struct {
-	Transporter *services.Transporter
+	Transporter services.Transporter
 }
 
 // Error packet to KM

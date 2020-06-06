@@ -16,12 +16,14 @@ import (
 func main() {
 	Pm2Io := pm2io.Pm2Io{
 		Config: &structures.Config{
-			PublicKey:  "ft_public",
-			PrivateKey: "ft_private",
-			Name:       "Golang App",
+			NonStandalone: true,
+			Name:          "Golang App",
 		},
 	}
-	Pm2Io.Start()
+	err := Pm2Io.Start()
+	if err != nil {
+		panic(err)
+	}
 
 	metric := structures.CreateMetric("test", "metric", "unit")
 	services.AddMetric(&metric)

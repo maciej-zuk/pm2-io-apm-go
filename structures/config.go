@@ -18,6 +18,7 @@ type Config struct {
 	Node            *string
 	Proxy           string
 	ProcessUniqueID string
+	NonStandalone   bool
 }
 
 // InitNames with random values
